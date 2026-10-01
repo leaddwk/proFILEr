@@ -1,0 +1,9 @@
+{
+  "name": "profiler-local",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A quiet, local file sharing space for all your devices.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node server.mjs", "dev": "node --watch server.mjs", "test": "node --test" }
+}

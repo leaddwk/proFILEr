@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f7">
+  <meta name="description" content="파일, 텍스트, 링크를 모든 기기에서 함께 쓰는 로컬 공유 공간, proFILEr.">
+  <title>proFILEr — 내 기기를 잇는 공유 공간</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="proFILEr 홈"><img src="/logo.svg" alt="proFILEr" width="209" height="43"></a>
+      <nav class="main-tabs" aria-label="주요 메뉴">
+        <button class="main-tab active" data-tab="share" aria-current="page"><span data-icon="share"></span>공유</button>
+        <button class="main-tab" data-tab="explorer"><span data-icon="folder"></span>익스플로러</button>
+      </nav>
+      <button class="connection-pill" id="connection-button" aria-label="다른 기기 연결 안내"><span class="status-dot"></span><span id="connection-label">연결 확인 중</span><span data-icon="wifi"></span></button>
+    </div>
+  </header>
+  <main class="workspace">
+    <section id="share-view" aria-labelledby="share-title">
+      <div class="page-heading">
+        <div><span class="eyebrow">SHARED SPACE</span><h1 id="share-title">나의 공유 공간<span class="title-dot">.</span></h1><p>파일도, 메모도, 링크도. 내 기기들이 만나는 곳.</p></div>
+        <div class="space-summary"><span class="summary-icon" data-icon="stack"></span><div><strong id="total-shares">—</strong><span id="total-size">공유 공간을 불러오는 중</span></div></div>
+      </div>
+      <div class="share-layout">
+        <aside class="composer-column">
+          <section class="card composer">
+            <div class="card-heading"><h2>새로운 공유</h2><span class="muted-icon" data-icon="plus"></span></div>
+            <div class="segmented composer-tabs" role="tablist" aria-label="공유 유형">
+              <button role="tab" class="selected" data-kind="file" aria-selected="true" aria-controls="file-composer" id="tab-file"><span data-icon="file"></span>파일</button>
+              <button role="tab" data-kind="text" aria-selected="false" aria-controls="text-composer" id="tab-text"><span data-icon="text"></span>텍스트</button>
+              <button role="tab" data-kind="link" aria-selected="false" aria-controls="link-composer" id="tab-link"><span data-icon="link"></span>링크</button>
+            </div>
+            <div id="file-composer" class="composer-panel" role="tabpanel" aria-labelledby="tab-file">
+              <button id="drop-zone" class="drop-zone"><span class="upload-symbol" data-icon="upload"></span><strong>여기에 파일을 놓아주세요</strong><span>또는 클릭해서 파일 선택</span><small id="upload-limit">여러 파일을 한 번에 공유할 수 있어요</small></button>
+              <input type="file" id="file-input" multiple hidden>
+              <div id="upload-queue" class="upload-queue" hidden></div>
+            </div>
+            <form id="text-composer" class="composer-panel" role="tabpanel" aria-labelledby="tab-text" hidden>
+              <label for="text-title">제목 <span class="optional">선택</span></label><input id="text-title" placeholder="메모의 이름을 지어주세요" maxlength="180">
+              <label for="text-content">공유할 텍스트</label><textarea id="text-content" rows="7" placeholder="기록해두고 싶은 생각, 다른 기기에서 필요한 문장…" required></textarea>
+              <button class="primary full" type="submit"><span data-icon="share"></span>텍스트 공유</button>
+            </form>
+            <form id="link-composer" class="composer-panel" role="tabpanel" aria-labelledby="tab-link" hidden>
+              <label for="link-title">제목 <span class="optional">선택</span></label><input id="link-title" placeholder="링크의 이름을 지어주세요" maxlength="180">
+              <label for="link-content">공유할 링크</label><input id="link-content" type="url" placeholder="https://" required>
+              <div class="link-hint"><span data-icon="link"></span><p>좋은 발견을 다른 기기에서도.<br>링크와 공유 기록을 함께 저장해요.</p></div>
+              <button class="primary full" type="submit"><span data-icon="share"></span>링크 공유</button>
+            </form>
+            <div class="destination"><span data-icon="folder"></span><span>저장 위치</span><button id="destination-button"><span id="destination-name">공유 폴더</span><span data-icon="chevronDown"></span></button></div>
+          </section>
+          <div class="device-note"><span class="device-note-icon" data-icon="devices"></span><div><strong>어느 기기에서든, 이어서.</strong><p>같은 네트워크에서 접속하면<br>iOS · 컴퓨터 · Android가 함께 공유해요.</p><button class="text-button" id="connect-shortcut">다른 기기 연결<span data-icon="plus"></span></button></div></div>
+        </aside>
+        <section class="card activity" aria-labelledby="activity-title">
+          <div class="activity-top"><div><h2 id="activity-title">공유 기록 <span class="count-badge" id="activity-count">0</span></h2><p>기기에서 건너온 것들, 시간 순서대로.</p></div><button class="icon-button" id="refresh-shares" aria-label="공유 기록 새로고침" title="새로고침"><span data-icon="refresh"></span></button></div>
+          <div class="activity-filters" aria-label="공유 기록 필터"><button class="filter active" data-filter="all">전체</button><button class="filter" data-filter="file">파일</button><button class="filter" data-filter="text">텍스트</button><button class="filter" data-filter="link">링크</button><span class="order-label"><span data-icon="clock"></span>최신순</span></div>
+          <div id="activity-list" class="activity-list" aria-live="polite"><div class="loading-state">공유 기록을 불러오고 있어요…</div></div>
+        </section>
+      </div>
+    </section>
+    <section id="explorer-view" aria-labelledby="explorer-title" hidden>
+      <div class="page-heading"><div><span class="eyebrow">FILE EXPLORER</span><h1 id="explorer-title">폴더 속으로<span class="title-dot">.</span></h1><p>익숙한 탐색, 한눈에 펼쳐지는 파일.</p></div><div class="segmented mode-switch" role="group" aria-label="익스플로러 모드"><button class="selected" data-mode="window" aria-pressed="true"><span data-icon="window"></span>윈도우</button><button data-mode="tree" aria-pressed="false"><span data-icon="tree"></span>트리</button></div></div>
+      <section class="card explorer-card">
+        <div class="explorer-toolbar">
+          <div id="path-toolbar" class="path-toolbar"><button class="icon-button" id="go-up" aria-label="상위 폴더" title="상위 폴더"><span data-icon="up"></span></button><div id="breadcrumbs" class="breadcrumbs"></div></div>
+          <div id="tree-heading" class="tree-heading" hidden><span data-icon="tree"></span><strong>공유 폴더</strong><span>폴더를 펼쳐 탐색하세요</span></div>
+          <div class="explorer-actions"><button class="subtle-button" id="new-folder"><span data-icon="folderPlus"></span><span>새 폴더</span></button><button class="icon-button" id="refresh-explorer" aria-label="폴더 새로고침" title="새로고침"><span data-icon="refresh"></span></button></div>
+        </div>
+        <div class="sort-toolbar"><div class="sort-caption"><span data-icon="sort"></span><span>정렬</span></div><label class="select-wrap"><span class="sr-only">정렬 기준</span><select id="sort-key"><option value="name">파일 이름</option><option value="date">공유 일시</option><option value="device">공유 기기</option></select><span data-icon="chevronDown"></span></label><button class="sort-direction" id="sort-direction" aria-label="내림차순으로 변경"><span data-icon="sortAsc"></span><span id="sort-direction-label">오름차순</span></button><span class="folder-first"><span data-icon="folder"></span>폴더 먼저</span><span id="explorer-count" class="explorer-count"></span></div>
+        <div class="file-table"><div class="file-table-head"><span>이름</span><span>공유 기기</span><span>공유 일시</span><span>크기</span><span class="sr-only">작업</span></div><div id="explorer-list" aria-live="polite"></div></div>
+        <div class="explorer-footer"><span data-icon="folder"></span><span id="explorer-location">공유 폴더</span><span id="folder-size"></span></div>
+      </section>
+    </section>
+    <footer class="app-footer"><span>proFILEr <span class="footer-dot">·</span> 가까운 기기, 하나의 공간</span><span><span data-icon="shield"></span>이 PC에 저장됩니다</span></footer>
+  </main>
+  <dialog id="connection-dialog" class="dialog"><div class="dialog-top"><span class="dialog-symbol" data-icon="devices"></span><button class="icon-button" data-close="connection-dialog" aria-label="닫기"><span data-icon="close"></span></button></div><h2>다른 기기와 연결하기</h2><p class="dialog-description">같은 Wi-Fi에 연결한 뒤, 휴대폰이나 다른 컴퓨터의 브라우저에 아래 주소를 입력해 주세요.</p><div id="network-addresses"></div><div class="info-note"><span data-icon="info"></span><p>연결이 되지 않으면 Windows 방화벽에서 Node.js의 <strong>개인 네트워크</strong> 접근을 허용해 주세요. 서버가 실행 중인 동안 사용할 수 있어요.</p></div><div class="local-folder-label">현재 공유 폴더</div><code id="local-folder-path"></code></dialog>
+  <dialog id="folder-dialog" class="dialog"><div class="dialog-top"><span class="dialog-symbol" data-icon="folderPlus"></span><button class="icon-button" data-close="folder-dialog" aria-label="닫기"><span data-icon="close"></span></button></div><h2>새 폴더 만들기</h2><p class="dialog-description" id="new-folder-location"></p><form id="folder-form"><label for="folder-name">폴더 이름</label><input id="folder-name" placeholder="새 폴더" maxlength="180" required><button class="primary full" type="submit">폴더 만들기</button></form></dialog>
+  <dialog id="destination-dialog" class="dialog folder-picker"><div class="dialog-top"><span class="dialog-symbol" data-icon="folder"></span><button class="icon-button" data-close="destination-dialog" aria-label="닫기"><span data-icon="close"></span></button></div><h2>어디에 공유할까요?</h2><div id="picker-path" class="picker-path"></div><div id="picker-folders" class="picker-folders"></div><div class="picker-actions"><button class="subtle-button" id="picker-new-folder"><span data-icon="folderPlus"></span>새 폴더</button><button class="primary" id="choose-destination">이 폴더 선택</button></div></dialog>
+  <dialog id="detail-dialog" class="dialog detail-dialog"><div class="dialog-top"><span id="detail-symbol" class="dialog-symbol"></span><button class="icon-button" data-close="detail-dialog" aria-label="닫기"><span data-icon="close"></span></button></div><h2 id="detail-title"></h2><div id="detail-meta" class="detail-meta"></div><div id="detail-content"></div><div id="detail-actions" class="detail-actions"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
