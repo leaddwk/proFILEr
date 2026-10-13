@@ -76,6 +76,37 @@ test('local sharing persists actual files, metadata, devices and folders safely'
     try { const shares = await (await fetch(`http://127.0.0.1:${reloaded.server.address().port}/api/shares`)).json(); assert.equal(shares.shares.length, 13); assert.equal(shares.shares.find(x => x.id === textRecord.id).available, false); }
     finally { await new Promise(resolve => reloaded.server.close(resolve)); }
   });
+  await t.test('clearing all history preserves files, explorer properties and previews after restart', async () => {
+    const before = (await request('/api/list')).data.entries;
+    const denied = await fetch(base + '/api/shares', { method: 'DELETE', headers: { Origin: 'https://external.example' } });
+    assert.equal(denied.status, 403);
+    assert.equal((await request('/api/shares')).data.shares.length, 13);
+    const response = await fetch(base + '/api/shares', { method: 'DELETE' });
+    assert.equal(response.status, 200);
+    assert.deepEqual((await request('/api/shares')).data.shares, []);
+    assert.equal((await request('/api/info')).data.totalShares, 0);
+    assert.deepEqual((await request('/api/list')).data.entries, before);
+    const binary = await fetch(base + '/api/download?path=data.bin');
+    assert.deepEqual(new Uint8Array(await binary.arrayBuffer()), Uint8Array.from([0, 255, 12, 88, 4]));
+    const link = (await request('/api/file?path=' + encodeURIComponent('참고 링크.url'))).data.share;
+    assert.equal(link.content, 'https://example.com/reference');
+    assert.equal(link.device, 'android');
+    const text = (await request('/api/file?path=' + encodeURIComponent('동시 공유.txt'))).data.share;
+    assert.match(text.content, /^message /);
+    const saved = JSON.parse(await fs.readFile(path.join(options.dataDir, 'shares.json'), 'utf8'));
+    assert.deepEqual(saved.history, []);
+    assert.ok(saved.files.every(record => !Object.hasOwn(record, 'content')));
+    const reloaded = await createApp(options);
+    await new Promise(resolve => reloaded.server.listen(0, '127.0.0.1', resolve));
+    try {
+      const reloadBase = `http://127.0.0.1:${reloaded.server.address().port}`;
+      assert.deepEqual((await (await fetch(reloadBase + '/api/shares')).json()).shares, []);
+      assert.deepEqual((await (await fetch(reloadBase + '/api/list')).json()).entries, before);
+    } finally { await new Promise(resolve => reloaded.server.close(resolve)); }
+    const next = await request('/api/share', { kind: 'text', name: '삭제 이후', content: '새 기록' });
+    assert.equal(next.status, 201);
+    assert.deepEqual((await request('/api/shares')).data.shares.map(record => record.id), [next.data.share.id]);
+  });
 });
 
 test('all six explorer sorts keep folders first, with natural filename order', () => {

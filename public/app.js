@@ -26,6 +26,7 @@ const paths = {
   copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
   external: '<path d="M14 3h7v7m0-7L10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
   shield: '<path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6zM8 12l3 3 5-6"/>',
   stack: '<path d="m12 3 10 5-10 5L2 8zM2 12l10 5 10-5M2 16l10 5 10-5"/>',
   window: '<rect x="2" y="3" width="20" height="18" rx="3"/><path d="M2 9h20M8 9v12M6 6h.01M9 6h.01"/>',
@@ -44,6 +45,7 @@ function paintIcons(root = document) { root.querySelectorAll('[data-icon]').forE
 paintIcons();
 
 const state = { tab: 'share', kind: 'file', filter: 'all', shares: [], info: null, destination: '', pickerPath: '', folderContext: '', mode: 'window', path: '', selectedFolder: '', sortKey: 'name', direction: 'asc', expanded: new Set(), cache: new Map(), uploading: false, loadingExplorer: false };
+let clearingHistory = false;
 try { const prefs = JSON.parse(localStorage.getItem('profiler-preferences') || '{}'); if (['window','tree'].includes(prefs.mode)) state.mode=prefs.mode; if (['name','date','device'].includes(prefs.sortKey)) state.sortKey=prefs.sortKey; if (['asc','desc'].includes(prefs.direction)) state.direction=prefs.direction; } catch {}
 const deviceNames = deviceLabels;
 const collator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
@@ -66,6 +68,7 @@ $$('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.ta
 
 function renderActivity() {
   $('#activity-count').textContent=state.shares.length;
+  $('#clear-shares').disabled=clearingHistory||state.shares.length===0;
   const list=state.shares.filter(share=>state.filter==='all'||share.kind===state.filter);
   if(!list.length){$('#activity-list').innerHTML=`<div class="empty-state"><span class="empty-icon">${icon(state.filter==='all'?'share':state.filter)}</span><strong>${state.shares.length?'아직 이 유형의 공유가 없어요':'첫 번째 공유를 기다리고 있어요'}</strong><p>${state.shares.length?'파일, 텍스트, 링크 중 다른 유형을 선택해 보세요.':'파일을 놓거나 짧은 메모를 남겨보세요.<br>어느 기기에서 보냈는지도 여기에 함께 기록돼요.'}</p></div>`;return;}
   let previousDay='';let html='';
@@ -93,6 +96,19 @@ async function refresh(quiet=false) {
 $$('[data-filter]').forEach(button=>button.addEventListener('click',()=>{state.filter=button.dataset.filter;$$('[data-filter]').forEach(el=>el.classList.toggle('active',el===button));renderActivity();}));
 $$('[data-kind]').forEach(button=>button.addEventListener('click',()=>{state.kind=button.dataset.kind;$$('[data-kind]').forEach(el=>{el.classList.toggle('selected',el===button);el.setAttribute('aria-selected',String(el===button));});$$('.composer-panel').forEach(el=>el.hidden=el.id!==`${state.kind}-composer`);}));
 $('#refresh-shares').addEventListener('click',()=>refresh());
+$('#clear-shares').addEventListener('click',()=>openDialog('clear-history-dialog'));
+$('#confirm-clear-shares').addEventListener('click',async()=>{
+  if(clearingHistory)return;
+  clearingHistory=true;
+  const button=$('#confirm-clear-shares');button.disabled=true;button.textContent='삭제 중…';renderActivity();
+  try{
+    await api('/api/shares',{method:'DELETE'});
+    state.shares=[];state.cache.clear();
+    if(state.info){state.info.totalShares=0;renderInfo();}
+    renderActivity();$('#clear-history-dialog').close();toast('전체 공유 기록을 삭제했어요.');await refresh();
+  }catch(error){toast(error.message,true);}
+  finally{clearingHistory=false;button.disabled=false;button.textContent='전체 기록 삭제';renderActivity();}
+});
 $('#connection-button').addEventListener('click',()=>openDialog('connection-dialog'));
 $('#connect-shortcut').addEventListener('click',()=>openDialog('connection-dialog'));
 $('#network-addresses').addEventListener('click',event=>{const button=event.target.closest('[data-copy-url]');if(button)copy(button.dataset.copyUrl);});
@@ -142,7 +158,7 @@ async function renderExplorer(){
 async function navigate(rel){state.path=rel;state.selectedFolder=rel;await renderExplorer();}
 $('#breadcrumbs').addEventListener('click',event=>{const button=event.target.closest('[data-navigate]');if(button)navigate(button.dataset.navigate);});
 $('#go-up').addEventListener('click',()=>navigate(state.path.split('/').slice(0,-1).join('/')));
-$('#explorer-list').addEventListener('click',async event=>{const folder=event.target.closest('[data-folder]');const expand=event.target.closest('[data-expand]');const entry=event.target.closest('[data-entry]');if(folder||expand){const rel=(folder||expand).dataset.folder??expand.dataset.expand;if(state.mode==='window'){await navigate(rel);}else{state.selectedFolder=rel;if(state.expanded.has(rel))state.expanded.delete(rel);else state.expanded.add(rel);await renderExplorer();}}if(entry){const share=state.shares.find(x=>x.path===entry.dataset.entry);if(share)openDetail(share);else{const a=document.createElement('a');a.href=downloadUrl(entry.dataset.entry);a.click();}}});
+$('#explorer-list').addEventListener('click',async event=>{const folder=event.target.closest('[data-folder]');const expand=event.target.closest('[data-expand]');const entry=event.target.closest('[data-entry]');if(folder||expand){const rel=(folder||expand).dataset.folder??expand.dataset.expand;if(state.mode==='window'){await navigate(rel);}else{state.selectedFolder=rel;if(state.expanded.has(rel))state.expanded.delete(rel);else state.expanded.add(rel);await renderExplorer();}}if(entry){const share=state.shares.find(x=>x.path===entry.dataset.entry);if(share)openDetail(share);else{const cached=[...state.cache.values()].flat().find(x=>x.path===entry.dataset.entry);if(cached?.id){try{openDetail((await api(`/api/file?path=${encodeURIComponent(entry.dataset.entry)}`)).share);}catch(error){toast(error.message,true);}}else{const a=document.createElement('a');a.href=downloadUrl(entry.dataset.entry);a.click();}}}});
 $$('[data-mode]').forEach(button=>button.addEventListener('click',()=>{state.mode=button.dataset.mode;savePreferences();renderExplorer();}));
 $('#sort-key').addEventListener('change',event=>{state.sortKey=event.target.value;savePreferences();renderExplorer();});
 $('#sort-direction').addEventListener('click',()=>{state.direction=state.direction==='asc'?'desc':'asc';savePreferences();renderExplorer();});

@@ -46,14 +46,31 @@ export async function createApp(options = {}) {
   const realRoot = await fs.realpath(root);
   const metadataPath = path.join(dataDir, 'shares.json');
   let records = [];
-  try { records = JSON.parse(await fs.readFile(metadataPath, 'utf8')); if (!Array.isArray(records)) throw new Error('Invalid shares.json'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  let fileRecords = new Map();
+  const fileMetadata = ({ content, ...record }) => record;
+  try {
+    const saved = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
+    // Accept existing history files; keep file properties separate from history.
+    if (Array.isArray(saved)) {
+      records = saved;
+      fileRecords = new Map([...records].reverse().map(record => [record.path.toLowerCase(), fileMetadata(record)]));
+    } else if (saved?.version === 2 && Array.isArray(saved.history) && Array.isArray(saved.files)) {
+      records = saved.history;
+      fileRecords = new Map(saved.files.map(record => [record.path.toLowerCase(), record]));
+    } else throw new Error('Invalid shares.json');
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
   let saveQueue = Promise.resolve();
-  const commit = (record) => {
+  const updateRecords = (update) => {
     const action = saveQueue.then(async () => {
-      const next = [record, ...records]; const temp = path.join(dataDir, 'shares.next.json');
-      await fs.writeFile(temp, JSON.stringify(next, null, 2)); await fs.rename(temp, metadataPath); records = next;
+      const next = update(records, fileRecords);
+      const temp = path.join(dataDir, 'shares.next.json');
+      await fs.writeFile(temp, JSON.stringify({ version: 2, history: next.history, files: [...next.files.values()] }, null, 2));
+      await fs.rename(temp, metadataPath);
+      records = next.history; fileRecords = next.files;
     }); saveQueue = action.catch(() => {}); return action;
   };
+  const commit = record => updateRecords((history, files) => ({ history: [record, ...history], files: new Map(files).set(record.path.toLowerCase(), fileMetadata(record)) }));
+  const clearHistory = () => updateRecords((history, files) => ({ history: [], files }));
   const resolvePath = async (relative = '') => {
     if (typeof relative !== 'string' || relative.includes('\\') || relative.includes('\0') || relative.split('/').some(s => s === '..' || s.includes(':') || s.startsWith('.profiler-'))) fail(403, '공유 폴더 밖의 경로에는 접근할 수 없어요.');
     const absolute = path.resolve(root, relative);
@@ -67,7 +84,7 @@ export async function createApp(options = {}) {
   };
   const relativeOf = absolute => path.relative(root, absolute).split(path.sep).join('/');
   const networkUrls = (port) => Object.values(os.networkInterfaces()).flat().filter(x => x && x.family === 'IPv4' && !x.internal).map(x => `http://${x.address}:${port}`);
-  const byPath = () => new Map([...records].reverse().map(r => [r.path.toLowerCase(), r]));
+  const byPath = () => fileRecords;
   const scan = async (absolute, metadata, depth = 0) => {
     if (depth > 100) fail(422, '폴더 깊이가 너무 깊어요.');
     const dirents = await fs.readdir(absolute, { withFileTypes: true }); const entries = [];
@@ -134,6 +151,24 @@ export async function createApp(options = {}) {
         const rel = url.searchParams.get('path') || ''; const folder = await resolvePath(rel);
         if (!(await fs.stat(folder)).isDirectory()) fail(400, '폴더 경로를 확인해 주세요.');
         return json(res, 200, { path: relativeOf(folder), entries: await scan(folder, byPath()) });
+      }
+      if (url.pathname === '/api/shares' && method === 'DELETE') {
+        await clearHistory();
+        return json(res, 200, { cleared: true });
+      }
+      if (url.pathname === '/api/file' && method === 'GET') {
+        const file = await resolvePath(url.searchParams.get('path') || '');
+        const record = fileRecords.get(relativeOf(file).toLowerCase());
+        if (!record) fail(404, '공유한 파일의 정보를 찾을 수 없어요.');
+        const stat = await fs.stat(file);
+        if (!stat.isFile()) fail(400, '파일을 선택해 주세요.');
+        const share = { ...record, size: stat.size, available: true };
+        if (['text', 'link'].includes(record.kind)) {
+          if (stat.size > 1024 * 1024) fail(413, '미리보기 용량을 초과했어요. 파일을 다운로드해 주세요.');
+          const content = await fs.readFile(file, 'utf8');
+          share.content = record.kind === 'link' ? validLink(content.match(/^URL=(.+)$/m)?.[1]?.trim() || '') : content;
+        }
+        return json(res, 200, { share });
       }
       if (url.pathname === '/api/upload' && method === 'POST') {
         const record = await store(req, url.searchParams.get('path') || '', url.searchParams.get('name') || '', 'file', null, req.headers['content-type']);
