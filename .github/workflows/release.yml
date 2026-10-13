@@ -1,17 +1,21 @@
-name: Windows release
+name: Cross-platform release
 on:
   push:
     branches: [main]
     paths: [package.json]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
-  group: windows-release
+  group: profiler-release
   cancel-in-progress: false
 jobs:
-  release:
-    runs-on: windows-latest
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-15, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,21 +24,48 @@ jobs:
       - name: Test application
         run: node --test
       - name: Test portable runtime setup
+        if: runner.os == 'Windows'
         shell: powershell
         run: ./scripts/start-windows.ps1 -SetupOnly
-      - name: Package clean Windows ZIP
-        shell: pwsh
-        run: ./scripts/package-release.ps1
+      - name: Build clean ZIPs
+        run: node scripts/package-release.mjs
+      - name: Verify Unix ZIP contents and executable permissions
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import glob, zipfile
+          for filename in glob.glob('dist/*.zip'):
+              with zipfile.ZipFile(filename) as archive:
+                  assert archive.testzip() is None
+                  for entry in archive.infolist():
+                      assert not any(part in entry.filename.split('/') for part in ['shared', '.profiler', '.runtime', '.env'])
+                      if entry.filename.endswith(('.sh', '.command')):
+                          assert (entry.external_attr >> 16) & 0o111 == 0o111
+          PY
+  release:
+    needs: validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build clean ZIPs
+        run: node scripts/package-release.mjs
       - name: Publish release
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
-          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          $tag = "v$version"
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; update package.json for a new release." }
-          gh release create $tag "dist/proFILEr-v$version-windows.zip" "dist/proFILEr-v$version-windows.zip.sha256" --target $env:RELEASE_COMMIT --title "proFILEr $tag" --notes-file RELEASE_NOTES.md
-          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
+          version=$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')
+          tag="v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; update package.json for a new release." >&2
+            exit 1
+          fi
+          gh release create "$tag" dist/*.zip dist/*.sha256 --target "$RELEASE_COMMIT" --title "proFILEr $tag" --notes-file RELEASE_NOTES.md

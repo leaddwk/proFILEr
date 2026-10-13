@@ -8,7 +8,15 @@
 
 ## 시작하기
 
-**Windows 간편 실행:** [최신 Release](https://github.com/leaddwk/proFILEr/releases/latest)의 Windows ZIP을 풀고 `start.bat`을 더블 클릭하세요. 첫 실행에 공식 Node.js 22.23.3을 자동으로 준비하고 브라우저를 엽니다. 관리자 권한이나 시스템 설치가 필요 없으며, 다음 실행부터 앱 폴더의 런타임을 재사용합니다. 자세한 안내는 [QUICKSTART.md](QUICKSTART.md)를 참고하세요.
+**간편 실행:** [최신 Release](https://github.com/leaddwk/proFILEr/releases/latest)에서 운영체제에 맞는 ZIP을 받아 압축을 풉니다. 첫 실행에 공식 Node.js 22.23.3을 자동으로 준비하고 브라우저를 엽니다. 관리자 권한이나 시스템 설치가 필요 없으며, 다음 실행부터 앱 폴더의 런타임을 재사용합니다.
+
+| 운영체제 | 다운로드 | 실행 |
+| --- | --- | --- |
+| Windows | `…-windows.zip` | `start.bat` 더블 클릭 |
+| macOS | `…-macos.zip` | `start.command` 더블 클릭, 또는 터미널에서 `bash start.sh` |
+| Linux | `…-linux.zip` | 터미널에서 `bash start.sh` |
+
+macOS는 Apple Silicon·Intel, Linux는 x64·ARM64·ARMv7을 자동으로 구분합니다. 그래픽 환경이 없는 Linux에서는 접속 주소만 표시합니다. 자세한 요구 사항과 사용법은 [QUICKSTART.md](QUICKSTART.md)를 참고하세요.
 
 ### 소스에서 직접 실행
 
@@ -111,4 +119,8 @@ test/server.test.mjs  자동 테스트
 server.mjs            HTTP 서버와 파일·기록 API
 package.json          실행 설정
 start.bat             Windows 실행 도우미
+start.command         macOS 더블 클릭 실행
+start.sh              macOS·Linux 실행
+scripts/start-unix.sh  운영체제 구분과 Node.js 자동 준비
+scripts/package-release.mjs  운영체제별 ZIP 생성
 ```
