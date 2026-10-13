@@ -8,6 +8,10 @@
 
 ## 시작하기
 
+**Windows 간편 실행:** [최신 Release](https://github.com/leaddwk/proFILEr/releases/latest)의 Windows ZIP을 풀고 `start.bat`을 더블 클릭하세요. 첫 실행에 공식 Node.js 22.23.3을 자동으로 준비하고 브라우저를 엽니다. 관리자 권한이나 시스템 설치가 필요 없으며, 다음 실행부터 앱 폴더의 런타임을 재사용합니다. 자세한 안내는 [QUICKSTART.md](QUICKSTART.md)를 참고하세요.
+
+### 소스에서 직접 실행
+
 [Node.js](https://nodejs.org/) 22 이상을 설치한 뒤 프로젝트를 내려받고 실행합니다.
 
 ```sh
